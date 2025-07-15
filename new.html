@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Real-Time Water Supply Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <style>
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+    .node {
+      fill: #3b82f6;
+      stroke: #1e40af;
+      stroke-width: 2px;
+      cursor: pointer;
+    }
+    .node:hover {
+      fill: #60a5fa;
+    }
+    .link {
+      stroke: #9ca3af;
+      stroke-width: 2px;
+    }
+    .pump {
+      fill: #06b6d4;
+    }
+    .tank {
+      fill: #10b981;
+    }
+    .zone {
+      fill: #8b5cf6;
+    }
+    .valve {
+      fill: #f59e0b;
+    }
+    .selected {
+      stroke: #f59e0b;
+      stroke-width: 3px;
+    }
+    .edit-panel {
+      position: fixed;
+      right: 20px;
+      top: 20px;
+      width: 300px;
+      background: rgba(31, 41, 55, 0.9);
+      padding: 15px;
+      border-radius: 8px;
+      z-index: 100;
+    }
+    .node-form {
+      display: none;
+    }
+    .edge-form {
+      display: none;
+    }
+    .active-form {
+      display: block;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+  <!-- Header -->
+  <header class="py-8 bg-gradient-to-r from-blue-600 to-teal-500 text-center shadow-lg">
+    <h1 class="text-5xl font-extrabold">🚰 Water Supply Tracker</h1>
+    <p class="text-gray-200 text-lg mt-2">Monitor, Visualize and Manage City Water Supply Networks with Graph Algorithms</p>
+  </header>
+
+  <!-- Edit Panel -->
+  <div class="edit-panel shadow-xl">
+    <h3 class="text-xl font-bold mb-4">Graph Editor</h3>
+    
+    <div class="flex gap-2 mb-4">
+      <button id="addNodeBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">Add Node</button>
+      <button id="addEdgeBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">Add Edge</button>
+      <button id="removeBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">Remove</button>
+    </div>
+    
+    <div id="nodeForm" class="node-form bg-gray-700 p-4 rounded mb-4">
+      <h4 class="font-bold mb-2">Add New Node</h4>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">Node ID:</label>
+        <input type="text" id="nodeId" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+      </div>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">Node Name:</label>
+        <input type="text" id="nodeName" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+      </div>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">Node Type:</label>
+        <select id="nodeType" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+          <option value="tank">Tank</option>
+          <option value="pump">Pump Station</option>
+          <option value="zone">Zone</option>
+          <option value="valve">Valve</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">X Position:</label>
+        <input type="number" id="nodeX" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+      </div>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">Y Position:</label>
+        <input type="number" id="nodeY" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+      </div>
+      <button id="submitNode" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-sm">Add Node</button>
+    </div>
+    
+    <div id="edgeForm" class="edge-form bg-gray-700 p-4 rounded mb-4">
+      <h4 class="font-bold mb-2">Add New Edge</h4>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">From Node:</label>
+        <select id="edgeFrom" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+          <!-- Options will be populated dynamically -->
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">To Node:</label>
+        <select id="edgeTo" class="w-full bg-gray-800 rounded px-2 py-1 text-white">
+          <!-- Options will be populated dynamically -->
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="block text-sm mb-1">Weight (distance in meters):</label>
+        <input type="number" id="edgeWeight" class="w-full bg-gray-800 rounded px-2 py-1 text-white" value="100">
+      </div>
+      <button id="submitEdge" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-sm">Add Edge</button>
+    </div>
+    
+    <div class="bg-gray-700 p-4 rounded">
+      <h4 class="font-bold mb-2">Selected Node</h4>
+      <div id="selectedNodeInfo" class="text-sm">
+        Click on a node to view details
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Navigation -->
+  <nav class="flex justify-center gap-6 py-4 bg-gray-800">
+    <a href="#network" class="hover:text-teal-400">Water Network</a>
+    <a href="#algorithms" class="hover:text-teal-400">Algorithms</a>
+    <a href="#visualization" class="hover:text-teal-400">Visualization</a>
+    <a href="#logs" class="hover:text-teal-400">Logs</a>
+  </nav>
+
+  <!-- Water Network Section -->
+  <section id="network" class="p-8 text-center">
+    <h2 class="text-3xl font-bold mb-6">💧 City Water Network</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto">
+      <div class="card bg-gray-800 p-6 rounded-lg shadow">
+        <h3 class="text-teal-400 text-xl">Main Tank</h3>
+        <p class="text-gray-300 mt-2">Capacity: 10,000 L</p>
+        <p class="text-gray-300">Current: 8,500 L</p>
+      </div>
+      <div class="card bg-gray-800 p-6 rounded-lg shadow">
+        <h3 class="text-blue-400 text-xl">Pump Station A</h3>
+        <p class="text-gray-300 mt-2">Pressure: High</p>
+        <p class="text-gray-300">Flow: 120 L/s</p>
+      </div>
+      <div class="card bg-gray-800 p-6 rounded-lg shadow">
+        <h3 class="text-blue-400 text-xl">Pump Station B</h3>
+        <p class="text-gray-300 mt-2">Pressure: Moderate</p>
+        <p class="text-gray-300">Flow: 80 L/s</p>
+      </div>
+      <div class="card bg-gray-800 p-6 rounded-lg shadow">
+        <h3 class="text-green-400 text-xl">Residential Zone</h3>
+        <p class="text-gray-300 mt-2">Demand: 5,000 L</p>
+        <p class="text-gray-300">Supply: 4,800 L</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Algorithms Section -->
+  <section id="algorithms" class="p-8 bg-gray-800">
+    <h2 class="text-3xl font-bold text-center mb-6">📊 Graph Algorithms in Use</h2>
+    <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="card bg-gray-700 p-6 rounded-lg">
+        <h3 class="text-xl text-yellow-400">BFS (Shortest Route)</h3>
+        <p class="text-gray-300 mt-2">Find the shortest route from the Main Tank to any zone minimizing distance and delay.</p>
+        <button onclick="runBFS()" class="mt-3 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm">Run BFS</button>
+      </div>
+      <div class="card bg-gray-700 p-6 rounded-lg">
+        <h3 class="text-xl text-pink-400">DFS (Leak Detection)</h3>
+        <p class="text-gray-300 mt-2">Depth-First traversal to detect disconnected nodes or faults in pipelines.</p>
+        <button onclick="runDFS()" class="mt-3 bg-pink-600 hover:bg-pink-700 text-white px-3 py-1 rounded text-sm">Run DFS</button>
+      </div>
+      <div class="card bg-gray-700 p-6 rounded-lg">
+        <h3 class="text-xl text-green-400">Dijkstra (Fastest Path)</h3>
+        <p class="text-gray-300 mt-2">Calculates the path with the least cumulative supply delay between nodes.</p>
+        <button onclick="runDijkstra()" class="mt-3 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">Run Dijkstra</button>
+      </div>
+      <div class="card bg-gray-700 p-6 rounded-lg">
+        <h3 class="text-xl text-cyan-400">Graph-Based Control</h3>
+        <p class="text-gray-300 mt-2">Control valves, adjust pressure and reroute water dynamically using adjacency lists.</p>
+        <button onclick="optimizeNetwork()" class="mt-3 bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1 rounded text-sm">Optimize Network</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Network Visualization -->
+  <section id="visualization" class="p-8 text-center">
+    <h2 class="text-3xl font-bold mb-6">🌐 Network Graph Visualization</h2>
+    <div class="flex justify-center gap-4 mb-4">
+      <select id="startNode" class="bg-gray-700 text-white rounded px-3 py-2">
+        <option value="">Select Start Node</option>
+      </select>
+      <select id="endNode" class="bg-gray-700 text-white rounded px-3 py-2">
+        <option value="">Select End Node</option>
+      </select>
+    </div>
+    <div id="graph-container" class="bg-gray-800 rounded-lg p-4 max-w-4xl mx-auto">
+      <svg id="graph-svg" width="100%" height="500"></svg>
+    </div>
+    <div id="path-result" class="mt-4 text-xl"></div>
+  </section>
+
+  <!-- Logs Section -->
+  <section id="logs" class="p-8 text-center">
+    <h2 class="text-3xl font-bold mb-6">📖 Real-Time Logs</h2>
+    <div class="bg-gray-800 p-4 rounded-lg max-w-3xl mx-auto h-48 overflow-y-auto text-left" id="logBox">
+      <p class="text-gray-400">🔧 Water Supply Network Initialized...</p>
+      <p class="text-gray-400">📊 Graph data structure created with 8 nodes and 10 edges</p>
+    </div>
+    <button onclick="addLog()" class="mt-4 bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded">Simulate Log</button>
+  </section>
+
+  <!-- Footer -->
+  <footer class="text-center text-gray-500 py-6 bg-gray-900 mt-8">
+    &copy; 2025 Real-Time Water Tracker Project. All Rights Reserved.
+  </footer>
+
+  <script>
+    // Graph data structure implementation
+    class Graph {
+      constructor() {
+        this.nodes = [];
+        this.edges = {};
+        this.adjacencyList = {};
+      }
+
+      addNode(node) {
+        this.nodes.push(node);
+        this.adjacencyList[node.id] = [];
+      }
+
+      removeNode(nodeId) {
+        // Remove node from nodes array
+        this.nodes = this.nodes.filter(node => node.id !== nodeId);
+        
+        // Remove all edges connected to this node
+        Object.keys(this.edges).forEach(edgeKey => {
+          const [source, target] = edgeKey.split('-');
+          if (source === nodeId || target === nodeId) {
+            delete this.edges[edgeKey];
+          }
+        });
+        
+        // Remove from adjacency list
+        delete this.adjacencyList[nodeId];
+        
+        // Remove references from other nodes' adjacency lists
+        Object.keys(this.adjacencyList).forEach(key => {
+          this.adjacencyList[key] = this.adjacencyList[key].filter(
+            neighbor => neighbor.node !== nodeId
+          );
+        });
+      }
+
+      addEdge(source, target, weight) {
+        const edgeKey = `${source}-${target}`;
+        const reverseEdgeKey = `${target}-${source}`;
+        
+        // Check if edge already exists
+        if (this.edges[edgeKey] || this.edges[reverseEdgeKey]) {
+          return false;
+        }
+        
+        this.edges[edgeKey] = { source, target, weight };
+        this.adjacencyList[source].push({ node: target, weight });
+        // For undirected graph
+        this.adjacencyList[target].push({ node: source, weight });
+        return true;
+      }
+
+      removeEdge(source, target) {
+        const edgeKey = `${source}-${target}`;
+        const reverseEdgeKey = `${target}-${source}`;
+        
+        if (this.edges[edgeKey]) {
+          delete this.edges[edgeKey];
+        } else if (this.edges[reverseEdgeKey]) {
+          delete this.edges[reverseEdgeKey];
+        }
+        
+        // Remove from adjacency lists
+        this.adjacencyList[source] = this.adjacencyList[source].filter(
+          neighbor => neighbor.node !== target
+        );
+        this.adjacencyList[target] = this.adjacencyList[target].filter(
+          neighbor => neighbor.node !== source
+        );
+      }
+
+      bfs(start) {
+        const queue = [start];
+        const result = [];
+        const visited = {};
+        visited[start] = true;
+        
+        while(queue.length) {
+          const node = queue.shift();
+          result.push(node);
+          
+          this.adjacencyList[node].forEach(neighbor => {
+            if(!visited[neighbor.node]) {
+              visited[neighbor.node] = true;
+              queue.push(neighbor.node);
+            }
+          });
+        }
+        return result;
+      }
+
+      dfs(start) {
+        const stack = [start];
+        const result = [];
+        const visited = {};
+        visited[start] = true;
+        
+        while(stack.length) {
+          const node = stack.pop();
+          result.push(node);
+          
+          this.adjacencyList[node].forEach(neighbor => {
+            if(!visited[neighbor.node]) {
+              visited[neighbor.node] = true;
+              stack.push(neighbor.node);
+            }
+          });
+        }
+        return result;
+      }
+
+      dijkstra(start, end) {
+        const distances = {};
+        const previous = {};
+        const nodes = new Set(this.nodes.map(n => n.id));
+        let path = [];
+        
+        // Initialize distances
+        this.nodes.forEach(node => {
+          distances[node.id] = node.id === start ? 0 : Infinity;
+          previous[node.id] = null;
+        });
+        
+        while(nodes.size) {
+          let currentNode = this.getMinDistanceNode(nodes, distances);
+          nodes.delete(currentNode);
+          
+          if(currentNode === end) {
+            // Build path
+            while(previous[currentNode]) {
+              path.unshift(currentNode);
+              currentNode = previous[currentNode];
+            }
+            path.unshift(start);
+            break;
+          }
+          
+          if(distances[currentNode] === Infinity) break;
+          
+          this.adjacencyList[currentNode].forEach(neighbor => {
+            const distance = distances[currentNode] + neighbor.weight;
+            if(distance < distances[neighbor.node]) {
+              distances[neighbor.node] = distance;
+              previous[neighbor.node] = currentNode;
+            }
+          });
+        }
+        
+        return {
+          path,
+          distance: distances[end]
+        };
+      }
+      
+      getMinDistanceNode(nodes, distances) {
+        return Array.from(nodes).reduce((minNode, node) => 
+          distances[node] < distances[minNode] ? node : minNode
+        );
+      }
+    }
+
+    // Create water network graph
+    const waterNetwork = new Graph();
+    
+    // Nodes represent different points in the water system
+    const nodes = [
+      { id: "main-tank", name: "Main Tank", type: "tank" },
+      { id: "pump-a", name: "Pump Station A", type: "pump" },
+      { id: "pump-b", name: "Pump Station B", type: "pump" },
+      { id: "residential", name: "Residential Zone", type: "zone" },
+      { id: "industrial", name: "Industrial Zone", type: "zone" },
+      { id: "valve-1", name: "Control Valve 1", type: "valve" },
+      { id: "valve-2", name: "Control Valve 2", type: "valve" },
+      { id: "storage-1", name: "Storage Tank 1", type: "tank" }
+    ];
+    
+    // Add nodes to graph
+    nodes.forEach(node => waterNetwork.addNode(node));
+    
+    // Edges represent pipes with weights (distance in meters)
+    waterNetwork.addEdge("main-tank", "pump-a", 500);
+    waterNetwork.addEdge("main-tank", "pump-b", 700);
+    waterNetwork.addEdge("pump-a", "valve-1", 300);
+    waterNetwork.addEdge("pump-b", "valve-2", 400);
+    waterNetwork.addEdge("valve-1", "residential", 200);
+    waterNetwork.addEdge("valve-1", "industrial", 600);
+    waterNetwork.addEdge("valve-2", "residential", 450);
+    waterNetwork.addEdge("valve-2", "storage-1", 350);
+    waterNetwork.addEdge("storage-1", "industrial", 250);
+    waterNetwork.addEdge("residential", "industrial", 500);
+
+    // Initialize SVG visualization
+    const svg = document.getElementById("graph-svg");
+    const width = svg.clientWidth;
+    const height = svg.clientHeight;
+    
+    // Node positions for visualization
+    let nodePositions = {
+      "main-tank": { x: width * 0.2, y: height * 0.5 },
+      "pump-a": { x: width * 0.35, y: height * 0.3 },
+      "pump-b": { x: width * 0.35, y: height * 0.7 },
+      "valve-1": { x: width * 0.5, y: height * 0.3 },
+      "valve-2": { x: width * 0.5, y: height * 0.7 },
+      "residential": { x: width * 0.65, y: height * 0.4 },
+      "industrial": { x: width * 0.65, y: height * 0.6 },
+      "storage-1": { x: width * 0.65, y: height * 0.8 }
+    };
+    
+    // Selected node for editing
+    let selectedNodeId = null;
+    let isAddingEdge = false;
+    let edgeStartNode = null;
+    
+    // Draw the graph
+    function drawGraph() {
+      svg.innerHTML = '';
+      
+      // Draw edges first
+      Object.values(waterNetwork.edges).forEach(edge => {
+        const source = nodePositions[edge.source];
+        const target = nodePositions[edge.target];
+        
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", source.x);
+        line.setAttribute("y1", source.y);
+        line.setAttribute("x2", target.x);
+        line.setAttribute("y2", target.y);
+        line.setAttribute("class", "link");
+        line.setAttribute("id", `edge-${edge.source}-${edge.target}`);
+        svg.appendChild(line);
+        
+        // Add weight label
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", (source.x + target.x) / 2);
+        text.setAttribute("y", (source.y + target.y) / 2);
+        text.setAttribute("fill", "white");
+        text.setAttribute("font-size", "12");
+        text.setAttribute("text-anchor", "middle");
+        text.textContent = edge.weight + "m";
+        svg.appendChild(text);
+      });
+      
+      // Draw nodes
+      waterNetwork.nodes.forEach(node => {
+        const pos = nodePositions[node.id];
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", pos.x);
+        circle.setAttribute("cy", pos.y);
+        circle.setAttribute("r", 20);
+        circle.setAttribute("class", `node ${node.type}`);
+        circle.setAttribute("id", `node-${node.id}`);
+        circle.setAttribute("data-id", node.id);
+        circle.addEventListener("click", () => handleNodeClick(node.id));
+        svg.appendChild(circle);
+        
+        // Add node label
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", pos.x);
+        text.setAttribute("y", pos.y + 35);
+        text.setAttribute("fill", "white");
+        text.setAttribute("font-size", "12");
+        text.setAttribute("text-anchor", "middle");
+        text.textContent = node.name;
+        svg.appendChild(text);
+      });
+      
+      // Populate dropdowns
+      updateNodeDropdowns();
+    }
+    
+    // Update all node dropdowns in the UI
+    function updateNodeDropdowns() {
+      const startSelect = document.getElementById("startNode");
+      const endSelect = document.getElementById("endNode");
+      const edgeFromSelect = document.getElementById("edgeFrom");
+      const edgeToSelect = document.getElementById("edgeTo");
+      
+      // Clear existing options
+      startSelect.innerHTML = '<option value="">Select Start Node</option>';
+      endSelect.innerHTML = '<option value="">Select End Node</option>';
+      edgeFromSelect.innerHTML = '<option value="">Select From Node</option>';
+      edgeToSelect.innerHTML = '<option value="">Select To Node</option>';
+      
+      // Add current nodes
+      waterNetwork.nodes.forEach(node => {
+        const option = document.createElement("option");
+        option.value = node.id;
+        option.textContent = node.name;
+        
+        startSelect.appendChild(option.cloneNode(true));
+        endSelect.appendChild(option.cloneNode(true));
+        edgeFromSelect.appendChild(option.cloneNode(true));
+        edgeToSelect.appendChild(option.cloneNode(true));
+      });
+    }
+    
+    // Handle node click events
+    function handleNodeClick(nodeId) {
+      if (isAddingEdge) {
+        if (!edgeStartNode) {
+          edgeStartNode = nodeId;
+          highlightNode(nodeId);
+          addLog(`🔗 Select target node for edge from ${getNodeName(nodeId)}`);
+        } else {
+          // Complete the edge
+          const weight = parseInt(prompt("Enter edge weight (distance in meters):", "100")) || 100;
+          const added = waterNetwork.addEdge(edgeStartNode, nodeId, weight);
+          
+          if (added) {
+            addLog(`➕ Added edge: ${getNodeName(edgeStartNode)} ↔ ${getNodeName(nodeId)} (${weight}m)`);
+            drawGraph();
+          } else {
+            addLog(`⚠ Edge already exists between ${getNodeName(edgeStartNode)} and ${getNodeName(nodeId)}`);
+          }
+          
+          // Reset edge creation state
+          isAddingEdge = false;
+          edgeStartNode = null;
+          document.getElementById("addEdgeBtn").classList.remove("bg-green-700");
+          resetVisualization();
+        }
+      } else {
+        selectedNodeId = nodeId;
+        highlightNode(nodeId);
+        updateSelectedNodeInfo(nodeId);
+      }
+    }
+    
+    // Get node name by ID
+    function getNodeName(nodeId) {
+      const node = waterNetwork.nodes.find(n => n.id === nodeId);
+      return node ? node.name : nodeId;
+    }
+    
+    // Update selected node info panel
+    function updateSelectedNodeInfo(nodeId) {
+      const node = waterNetwork.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      
+      const infoDiv = document.getElementById("selectedNodeInfo");
+      infoDiv.innerHTML = `
+        <div class="mb-1"><span class="font-semibold">Name:</span> ${node.name}</div>
+        <div class="mb-1"><span class="font-semibold">Type:</span> ${node.type}</div>
+        <div class="mb-1"><span class="font-semibold">ID:</span> ${node.id}</div>
+        <div class="mt-2 text-yellow-400">Connected to:</div>
+        <ul class="text-xs">
+          ${waterNetwork.adjacencyList[nodeId].map(neighbor => 
+            `<li>${getNodeName(neighbor.node)} (${neighbor.weight}m)</li>`
+          ).join("") || "<li>No connections</li>"}
+        </ul>
+      `;
+    }
+    
+    // Highlight a node and its connections
+    function highlightNode(nodeId) {
+      // Reset all highlights
+      document.querySelectorAll(".node, .link").forEach(el => {
+        el.classList.remove("selected");
+      });
+      
+      // Highlight selected node
+      const nodeElement = document.getElementById(`node-${nodeId}`);
+      if (nodeElement) {
+        nodeElement.classList.add("selected");
+      }
+      
+      // Highlight connected edges
+      waterNetwork.adjacencyList[nodeId].forEach(neighbor => {
+        const edgeId = `edge-${nodeId}-${neighbor.node}`;
+        const reverseEdgeId = `edge-${neighbor.node}-${nodeId}`;
+        
+        if(document.getElementById(edgeId)) {
+          document.getElementById(edgeId).classList.add("selected");
+        } else if(document.getElementById(reverseEdgeId)) {
+          document.getElementById(reverseEdgeId).classList.add("selected");
+        }
+      });
+      
+      addLog(`🔍 Selected node: ${getNodeName(nodeId)}`);
+    }
+    
+    // Add a new node to the graph
+    function addNewNode() {
+      const nodeId = document.getElementById("nodeId").value.trim();
+      const nodeName = document.getElementById("nodeName").value.trim();
+      const nodeType = document.getElementById("nodeType").value;
+      const x = parseInt(document.getElementById("nodeX").value) || 0;
+      const y = parseInt(document.getElementById("nodeY").value) || 0;
+      
+      if (!nodeId || !nodeName) {
+        alert("Please enter both node ID and name");
+        return;
+      }
+      
+      // Check if node already exists
+      if (waterNetwork.nodes.some(n => n.id === nodeId)) {
+        alert("Node with this ID already exists");
+        return;
+      }
+      
+      // Create new node
+      const newNode = { id: nodeId, name: nodeName, type: nodeType };
+      waterNetwork.addNode(newNode);
+      
+      // Add to positions
+      nodePositions[nodeId] = { x, y };
+      
+      // Redraw graph
+      drawGraph();
+      
+      // Reset form
+      document.getElementById("nodeForm").classList.remove("active-form");
+      document.getElementById("nodeId").value = "";
+      document.getElementById("nodeName").value = "";
+      
+      addLog(`➕ Added new node: ${nodeName} (${nodeType})`);
+    }
+    
+    // Remove selected node or edge
+    function removeSelected() {
+      if (!selectedNodeId) {
+        alert("Please select a node first");
+        return;
+      }
+      
+      const nodeName = getNodeName(selectedNodeId);
+      if (confirm(`Are you sure you want to remove node ${nodeName} and all its connections?`)) {
+        waterNetwork.removeNode(selectedNodeId);
+        delete nodePositions[selectedNodeId];
+        drawGraph();
+        addLog(`🗑 Removed node: ${nodeName}`);
+        selectedNodeId = null;
+        document.getElementById("selectedNodeInfo").innerHTML = "Click on a node to view details";
+      }
+    }
+    
+    // Start edge creation process
+    function startAddEdge() {
+      isAddingEdge = true;
+      edgeStartNode = null;
+      document.getElementById("addEdgeBtn").classList.add("bg-green-700");
+      addLog("🔗 Click on a node to start creating an edge");
+    }
+    
+    // Algorithm functions
+    function runBFS() {
+      const startNode = "main-tank";
+      const traversalOrder = waterNetwork.bfs(startNode);
+      addLog(`🔄 BFS traversal order: ${traversalOrder.map(getNodeName).join(" → ")}`);
+      
+      // Visualize the traversal
+      visualizeTraversal(traversalOrder, "BFS");
+    }
+    
+    function runDFS() {
+      const startNode = "main-tank";
+      const traversalOrder = waterNetwork.dfs(startNode);
+      addLog(`🔄 DFS traversal order: ${traversalOrder.map(getNodeName).join(" → ")}`);
+      
+      // Visualize the traversal
+      visualizeTraversal(traversalOrder, "DFS");
+    }
+    
+    function runDijkstra() {
+      const startNode = document.getElementById("startNode").value;
+      const endNode = document.getElementById("endNode").value;
+      
+      if(!startNode || !endNode) {
+        addLog("⚠ Please select both start and end nodes");
+        return;
+      }
+      
+      const result = waterNetwork.dijkstra(startNode, endNode);
+      
+      if(result.path.length) {
+        addLog(`🛣 Dijkstra's shortest path: ${result.path.map(getNodeName).join(" → ")} (Total distance: ${result.distance}m)`);
+        visualizePath(result.path);
+        document.getElementById("path-result").textContent = 
+          `Shortest path distance: ${result.distance}m`;
+      } else {
+        addLog("⚠ No path found between selected nodes");
+        document.getElementById("path-result").textContent = "No path found";
+      }
+    }
+    
+    function optimizeNetwork() {
+      // Simulate network optimization
+      addLog("⚙ Running network optimization...");
+      
+      // Find critical paths
+      const residentialPath = waterNetwork.dijkstra("main-tank", "residential");
+      const industrialPath = waterNetwork.dijkstra("main-tank", "industrial");
+      
+      setTimeout(() => {
+        addLog("✅ Network optimization complete");
+        addLog(`🏠 Residential path optimized: ${residentialPath.path.map(getNodeName).join(" → ")} (${residentialPath.distance}m)`);
+        addLog(`🏭 Industrial path optimized: ${industrialPath.path.map(getNodeName).join(" → ")} (${industrialPath.distance}m)`);
+        
+        // Visualize both paths
+        visualizePath(residentialPath.path, "residential");
+        setTimeout(() => {
+          visualizePath(industrialPath.path, "industrial");
+        }, 2000);
+      }, 1500);
+    }
+    
+    // Visualization helpers
+    function visualizeTraversal(order, algorithm) {
+      resetVisualization();
+      
+      let i = 0;
+      const interval = setInterval(() => {
+        if(i >= order.length) {
+          clearInterval(interval);
+          return;
+        }
+        
+        const nodeId = order[i];
+        const nodeElement = document.getElementById(`node-${nodeId}`);
+        
+        // Pulse animation
+        nodeElement.classList.add("animate__animated", "animate__pulse");
+        setTimeout(() => {
+          nodeElement.classList.remove("animate__animated", "animate__pulse");
+        }, 1000);
+        
+        addLog(`${algorithm} visiting: ${getNodeName(nodeId)}`);
+        i++;
+      }, 800);
+    }
+    
+    function visualizePath(path, type = "default") {
+      resetVisualization();
+      
+      // Color all nodes and edges along the path
+      for(let i = 0; i < path.length; i++) {
+        const nodeId = path[i];
+        const nodeElement = document.getElementById(`node-${nodeId}`);
+        nodeElement.classList.add("selected");
+        
+        if(type === "residential") {
+          nodeElement.style.fill = "#3b82f6"; // Blue for residential
+        } else if(type === "industrial") {
+          nodeElement.style.fill = "#ef4444"; // Red for industrial
+        }
+        
+        if(i < path.length - 1) {
+          const nextNodeId = path[i+1];
+          const edgeId = `edge-${nodeId}-${nextNodeId}`;
+          const reverseEdgeId = `edge-${nextNodeId}-${nodeId}`;
+          
+          if(document.getElementById(edgeId)) {
+            document.getElementById(edgeId).classList.add("selected");
+            if(type === "residential") document.getElementById(edgeId).style.stroke = "#3b82f6";
+            if(type === "industrial") document.getElementById(edgeId).style.stroke = "#ef4444";
+          } else if(document.getElementById(reverseEdgeId)) {
+            document.getElementById(reverseEdgeId).classList.add("selected");
+            if(type === "residential") document.getElementById(reverseEdgeId).style.stroke = "#3b82f6";
+            if(type === "industrial") document.getElementById(reverseEdgeId).style.stroke = "#ef4444";
+          }
+        }
+      }
+    }
+    
+    function resetVisualization() {
+      // Reset all visual elements
+      document.querySelectorAll(".node").forEach(node => {
+        node.classList.remove("selected");
+        node.style.fill = "";
+      });
+      
+      document.querySelectorAll(".link").forEach(link => {
+        link.classList.remove("selected");
+        link.style.stroke = "";
+      });
+      
+      document.getElementById("path-result").textContent = "";
+    }
+    
+    // Log functions
+    function addLog(message) {
+      if(!message) {
+        const actions = [
+          "🔄 Pump Station A pressure adjusted",
+          "💧 Water level in Main Tank decreased by 200L",
+          "⚠ Pressure drop detected in Valve 1",
+          "✅ Leak check completed in Residential Zone",
+          "📈 Demand increased in Industrial Zone",
+          "🔧 Maintenance scheduled for Pump Station B"
+        ];
+        message = actions[Math.floor(Math.random() * actions.length)];
+      }
+      
+      const logBox = document.getElementById("logBox");
+      const newLog = document.createElement("p");
+      newLog.className = "text-gray-400";
+      newLog.innerHTML = `${message} <span class="text-gray-500 text-sm">${new Date().toLocaleTimeString()}</span>`;
+      logBox.appendChild(newLog);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    
+    // Initialize the application
+    window.onload = function() {
+      drawGraph();
+      addLog("🚀 Water network visualization ready");
+      
+      // Set up event listeners for edit panel
+      document.getElementById("addNodeBtn").addEventListener("click", () => {
+        document.getElementById("nodeForm").classList.toggle("active-form");
+        document.getElementById("edgeForm").classList.remove("active-form");
+      });
+      
+      document.getElementById("addEdgeBtn").addEventListener("click", () => {
+        document.getElementById("edgeForm").classList.toggle("active-form");
+        document.getElementById("nodeForm").classList.remove("active-form");
+        if (document.getElementById("edgeForm").classList.contains("active-form")) {
+          startAddEdge();
+        } else {
+          isAddingEdge = false;
+          edgeStartNode = null;
+          document.getElementById("addEdgeBtn").classList.remove("bg-green-700");
+          resetVisualization();
+        }
+      });
+      
+      document.getElementById("removeBtn").addEventListener("click", removeSelected);
+      document.getElementById("submitNode").addEventListener("click", addNewNode);
+      
+      document.getElementById("submitEdge").addEventListener("click", () => {
+        const fromNode = document.getElementById("edgeFrom").value;
+        const toNode = document.getElementById("edgeTo").value;
+        const weight = parseInt(document.getElementById("edgeWeight").value) || 100;
+        
+        if (!fromNode || !toNode) {
+          alert("Please select both from and to nodes");
+          return;
+        }
+        
+        if (fromNode === toNode) {
+          alert("Cannot create edge from a node to itself");
+          return;
+        }
+        
+        const added = waterNetwork.addEdge(fromNode, toNode, weight);
+        
+        if (added) {
+          addLog(`➕ Added edge: ${getNodeName(fromNode)} ↔ ${getNodeName(toNode)} (${weight}m)`);
+          drawGraph();
+          document.getElementById("edgeForm").classList.remove("active-form");
+        } else {
+          addLog(`⚠ Edge already exists between ${getNodeName(fromNode)} and ${getNodeName(toNode)}`);
+        }
+      });
+      
+      // Allow clicking on SVG background to cancel edge creation
+      svg.addEventListener("click", (e) => {
+        if (e.target.tagName === "svg" && isAddingEdge) {
+          isAddingEdge = false;
+          edgeStartNode = null;
+          document.getElementById("addEdgeBtn").classList.remove("bg-green-700");
+          document.getElementById("edgeForm").classList.remove("active-form");
+          resetVisualization();
+          addLog("❌ Edge creation canceled");
+        }
+      });
+    };
+  </script>
+</body>
+</html>
