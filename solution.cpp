@@ -1,110 +1,111 @@
 #include <iostream>
 #include <vector>
 #include <queue>
-#include <unordered_map>
 #include <climits>
-#include <algorithm>
-
 using namespace std;
 
 class Graph {
-    unordered_map<string, vector<pair<string, int>>> adj;
+    int V;
+    vector<vector<pair<int, int>>> adj;
 
 public:
-    // Add a connection (pipe)
-    void addEdge(string u, string v, int w) {
+    Graph(int v) {
+        V = v;
+        adj.resize(V);
+    }
+
+    void addEdge(int u, int v, int w) {
         adj[u].push_back({v, w});
-        adj[v].push_back({u, w}); // undirected graph
+        adj[v].push_back({u, w});
     }
 
-    // Remove a connection (pipe)
-    void removeEdge(string u, string v) {
-        auto &vecU = adj[u];
-        vecU.erase(remove_if(vecU.begin(), vecU.end(), [&](auto &p) { return p.first == v; }), vecU.end());
+    void BFS(int start) {
+        vector<bool> visited(V, false);
+        queue<int> q;
 
-        auto &vecV = adj[v];
-        vecV.erase(remove_if(vecV.begin(), vecV.end(), [&](auto &p) { return p.first == u; }), vecV.end());
-    }
-
-    // BFS traversal
-    void BFS(string start) {
-        unordered_map<string, bool> visited;
-        queue<string> q;
-        q.push(start);
         visited[start] = true;
+        q.push(start);
 
-        cout << "BFS: ";
+        cout << "\nPerforming BFS starting from node " << start << ":\n";
         while (!q.empty()) {
-            string node = q.front(); q.pop();
-            cout << node << " ";
+            int node = q.front();
+            q.pop();
+            cout << "Visited node " << node << "\n";
 
-            for (auto &neigh : adj[node]) {
+            for (auto neigh : adj[node]) {
                 if (!visited[neigh.first]) {
                     visited[neigh.first] = true;
                     q.push(neigh.first);
                 }
             }
         }
-        cout << endl;
     }
 
-    // DFS traversal
-    void DFSUtil(string node, unordered_map<string, bool> &visited) {
+    void DFSUtil(int node, vector<bool> &visited) {
         visited[node] = true;
-        cout << node << " ";
+        cout << "Visited node " << node << "\n";
 
-        for (auto &neigh : adj[node]) {
-            if (!visited[neigh.first])
+        for (auto neigh : adj[node]) {
+            if (!visited[neigh.first]) {
                 DFSUtil(neigh.first, visited);
+            }
         }
     }
 
-    void DFS(string start) {
-        unordered_map<string, bool> visited;
-        cout << "DFS: ";
+    void DFS(int start) {
+        vector<bool> visited(V, false);
+        cout << "\nPerforming DFS starting from node " << start << ":\n";
         DFSUtil(start, visited);
-        cout << endl;
     }
 
-    // Dijkstra’s Algorithm: Shortest path from source
-    void dijkstra(string src) {
-        unordered_map<string, int> dist;
-        for (auto &pair : adj)
-            dist[pair.first] = INT_MAX;
-
+    void dijkstra(int src) {
+        vector<int> dist(V, INT_MAX);
         dist[src] = 0;
-        priority_queue<pair<int, string>, vector<pair<int, string>>, greater<>> pq;
+
+        priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> pq;
         pq.push({0, src});
 
         while (!pq.empty()) {
-            auto [d, u] = pq.top(); pq.pop();
+            int d = pq.top().first;
+            int u = pq.top().second;
+            pq.pop();
 
-            for (auto &[v, weight] : adj[u]) {
-                if (dist[v] > d + weight) {
-                    dist[v] = d + weight;
+            for (auto neigh : adj[u]) {
+                int v = neigh.first;
+                int w = neigh.second;
+
+                if (dist[v] > d + w) {
+                    dist[v] = d + w;
                     pq.push({dist[v], v});
                 }
             }
         }
 
-        cout << "Shortest distances from " << src << ":\n";
-        for (auto &[node, d] : dist)
-            cout << node << ": " << (d == INT_MAX ? -1 : d) << "\n";
+        cout << "\nShortest distances from node " << src << ":\n";
+        for (int i = 0; i < V; i++) {
+            if (dist[i] == INT_MAX)
+                cout << "Node " << i << " is unreachable\n";
+            else
+                cout << "Node " << i << " : " << dist[i] << "\n";
+        }
     }
 };
 
 int main() {
-    Graph g;
+    cout << "Creating a simple water supply system graph...\n";
 
-    g.addEdge("Source", "Tank1", 4);
-    g.addEdge("Tank1", "Junction1", 2);
-    g.addEdge("Junction1", "House1", 5);
-    g.addEdge("Junction1", "House2", 6);
-    g.addEdge("Tank1", "House3", 10);
+    Graph g(6);
 
-    g.BFS("Source");
-    g.DFS("Source");
-    g.dijkstra("Source");
+    cout << "Adding connections between nodes with their distances...\n";
+    g.addEdge(0, 1, 4);
+    g.addEdge(1, 2, 2);
+    g.addEdge(2, 3, 5);
+    g.addEdge(2, 4, 6);
+    g.addEdge(1, 5, 10);
+
+    g.BFS(0);
+    g.DFS(0);
+    g.dijkstra(0);
 
     return 0;
 }
